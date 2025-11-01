@@ -418,16 +418,16 @@ function loadYamlFromTag(){
 /* Bindings */
 document.getElementById('openBtn').onclick=()=>{
   try{
-    const u=buildURL(); if(!u) return alert('Saknar baseUrl/pid.');
-    if(u.length>1800) return alert('URL för lång – korta description/summary.');
+    const u=buildURL(); if(!u) return alert('Missing baseUrl/pid.');
+    if(u.length>1800) return alert('URL to long – shorten description/summary.');
     window.open(u,'_blank','noopener,noreferrer');
   }catch(e){ showError(e); }
 };
 document.getElementById('copyBtn').onclick=async()=>{
   try{
-    const u=buildURL(); if(!u) return alert('Ingen URL.');
-    if(u.length>1800) return alert('URL för lång – korta description/summary.');
-    await navigator.clipboard.writeText(u); alert('URL kopierad.');
+    const u=buildURL(); if(!u) return alert('No URL.');
+    if(u.length>1800) return alert('URL to long – shorten description/summary.');
+    await navigator.clipboard.writeText(u); alert('URL copied.');
   }catch(e){ showError(e); }
 };
 selTemplate.onchange=e=>applyTemplate(e.target.value);
