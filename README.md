@@ -1,11 +1,11 @@
-# (Simple) Jira Template Generator  
+#  (Simple) Jira Templates
 [![Made with HTML](https://img.shields.io/badge/Made%20with-HTML-orange.svg)](https://developer.mozilla.org/en-US/docs/Web/HTML)
 [![No dependencies](https://img.shields.io/badge/Dependencies-None-brightgreen.svg)](#)
 [![Runs locally](https://img.shields.io/badge/Runs-Locally-blue.svg)](#)
 
 ---
 
-## Background
+##  Background
 By pure coincidence, I discovered that Jira can pre-fill issue fields simply by adding parameters to a **URL**.  
 When I clicked one of those URLs, a new issue opened — already filled in!  
 It turned out this wasn’t an official API, but rather an **internal Jira feature** used by the platform itself.
@@ -17,7 +17,7 @@ Note: you need to be logged in to Jira for this to work, use at own risk.
 
 ---
 
-## Editing templates
+##  Editing templates
 
 All templates and configuration live **at the top of the HTML file**, inside a YAML block:
 
@@ -52,7 +52,7 @@ defaults:
 </script>
 ```
 
-💡 You edit the YAML **directly inside the file**.  
+You edit the YAML **directly inside the file**.  
 Reason: a Single Page Application (SPA) cannot load local files due to browser sandbox (CORS) restrictions.  
 By embedding YAML inline, the tool remains fully self-contained — no dependencies, no external calls.
 
@@ -126,15 +126,18 @@ python3 -m http.server 8080
 
 ## Reference links
 
-If you want to read about Jira’s built-in URL parameter feature, Atlassian provides these public references:
+If you want to learn more about Jira’s built-in URL parameter support for pre-filling issue fields, see:
 
-- **Atlassian Knowledge Base:** [How to create issues using direct HTML links in Jira Server](https://confluence.atlassian.com/jirakb/how-to-create-issues-using-direct-html-links-in-jira-server-159474.html)  
+- **Atlassian Knowledge Base:** [How to create issues using direct HTML links in Jira Server](https://confluence.atlassian.com/display/JIRAKB/How+to+create+issues+using+direct+HTML+links+in+Jira+Server)  
   Example:  
   ```
   https://jira.atlassian.com/secure/CreateIssueDetails!init.jspa?pid=10420&issuetype=4&summary=say+hello+world
   ```
 
-- **Community discussion:** [Pre-populate Label in CreateIssue URL](https://community.atlassian.com/t5/Jira-questions/Pre-populate-Label-in-CreateIssue-URL/qaq-p/628361)
+- **Atlassian Community:** [Pre-populate Label in CreateIssue URL](https://community.atlassian.com/t5/Jira-questions/Pre-populate-Label-in-CreateIssue-URL/qaq-p/628361)
+
+These links may not work directly from GitHub due to Atlassian’s referer filtering.  
+If you get a block or blank page — simply **reload the page** or paste the URL manually in your browser.
 
 ---
 
