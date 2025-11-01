@@ -75,7 +75,7 @@ defaults:
       Bug: 1
       Epic: 2
 
-  dynamics:
+  dynamic_fields:
     environment:
       lab:   ["LabA","LabB","LabC"]
       node:  ["Node1","Node2","Node3"]
@@ -136,7 +136,7 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
   <div id="descRendered" class="small"></div>
 </div>
 
-<!-- Dynamics (ex: environment) -->
+<!-- dynamic_fields (ex: environment) -->
 <div id="dynamicFieldsContainers"></div>
 
 <!-- Rest of fields -->
@@ -255,7 +255,7 @@ const selTemplate=$('templateSelect'),projectName=$('projectName'),
       descRaw=$('descriptionRaw'),descRendered=$('descRendered'),
       orderedTop=$('orderedFieldsTop'),dynContainers=$('dynamicFieldsContainers'),
       dynFieldsWrap=$('dynamicFields'),out=$('out');
-let config={},currentPid='',currentFieldState={},dynamicState={};
+let config={},currentPid='',currentFieldState={},dynamic_fieldstate={};
 
 function clear(el){while(el.firstChild)el.removeChild(el.firstChild);}
 
@@ -316,10 +316,10 @@ function renderDynamicFieldsFromTemplate(t){
 function populateSelect(sel,arr){while(sel.firstChild)sel.removeChild(sel.firstChild);(arr||[]).forEach(v=>sel.add(new Option(v,v)));}
 function composeDynamicValue(selects){return selects.map(s=>s.selEl.value).filter(Boolean).join(', ');}
 function renderDynamicContainers(templateObj){
-  clear(dynContainers); dynamicState={};
-  const d=config.defaults||{}, dyns=d.dynamics||{}, templateKeys=new Set(Object.keys(templateObj||{}));
+  clear(dynContainers); dynamic_fieldstate={};
+  const d=config.defaults||{}, dyns=d.dynamic_fields||{}, templateKeys=new Set(Object.keys(templateObj||{}));
   Object.keys(dyns).forEach(fieldName=>{
-    if(templateKeys.has(fieldName)) return; // mallen överstyr dynamics
+    if(templateKeys.has(fieldName)) return; // mallen överstyr dynamic_fields
     const groups=dyns[fieldName]; if(!groups||typeof groups!=='object') return;
 
     const row=document.createElement('div');row.className='row';
@@ -345,7 +345,7 @@ function renderDynamicContainers(templateObj){
     selects.forEach(s=>s.selEl.addEventListener('change', update));
     update();
 
-    dynamicState[fieldName] = { inputEl: input, selects, composeFn: update };
+    dynamic_fieldstate[fieldName] = { inputEl: input, selects, composeFn: update };
     row.appendChild(box); dynContainers.appendChild(row);
   });
 }
@@ -362,8 +362,8 @@ function buildURL(){
   p.append('components','Comp1');
   p.append('labels','Label1');
 
-  // Dynamics
-  Object.entries(dynamicState).forEach(([fname,st])=>{
+  // dynamic_fields
+  Object.entries(dynamic_fieldstate).forEach(([fname,st])=>{
     const v=(st.inputEl.value||'').trim(); if(v) p.set(fname, v);
   });
 
