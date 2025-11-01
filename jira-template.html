@@ -3,50 +3,52 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Jira Mall (bold-only, no deps)</title>
+<title>Simple Jira Templates (bold-only, no deps)</title>
 
-<!-- ===== YAML – redigera här ===== -->
+<!-- ===== YAML – edit here ===== -->
 <script type="text/yaml" id="templatesYaml">
 templates:
-  "Felrapport Software-3":
+  "Trouble report Software-3":
     project: "X-3"
     issuetype: "Bug"
     summary: "Bug: <text>"
     description: |
-      *Felbeskrivning*
-      <text>
+      *Problem description*
+      Explain the issue briefly
 
-      *Felupprepning*
-      <text>
-  "Felrapport Software-4":
+      *Steps to reproduce*
+      Describe the steps you took before encountering the issue
+      
+      *Expected result*
+      Describe the result you expected
+  "Trouble Report Software-4":
     project: "X-4"
     issuetype: "Bug"
     summary: "Bug: <text>"
     description: |
-      *Felbeskrivning*
-      <text>
+      *Problem description*
+      Explain the issue briefly
 
-      *Felupprepning*
-      <text>
-  "Felrapport R2D2":
+      *Steps to reproduce*
+      Describe the steps you took before encountering the issue
+      
+      *Expected result*
+      Describe the result you expected
+  "Trouble Report R2D2-droid":
     project: projX
     issuetype: Bug
-    summary: "R2-D2: ljudmodul störd"
+    summary: "R2-D2: soundmodule broken"
     description: |
-      *Felbeskrivning*
-      R2-D2 avger oönskade visslingar vid hög last.
+      *Problem description*
+      R2-D2 produces unwanted whistling noices during high load.
 
-      *Felupprepning*
-      1. Starta hyperdrive-diagnostik
-      2. Aktivera ljudmodul
-      3. Observera distorsion
+      *Steps to reproduce*
+      1. Start hyperdrive-diagnostics
+      2. Activate soundmodule
+      3. Observe distorsion
 
-      *Förväntat*
-      Klar, melodisk beeps-bops utan distorsion.
-
-      || Modul || Status ||
-      | soundgenerator | överhettar |
-      | hologramviewer | OK |
+      *Expected result*
+      Clear, melodic beep-bobs without distortion.
 
     labels: "droid,audio"
     customfield_12345: "SG-5"
@@ -60,10 +62,10 @@ defaults:
   pid:
     "CCX-3": 10302
 
-  # fält som ska visas direkt under Project
+  # fields that shall be shown under project (this is your chance of order the presentation of the fields)
   order: ["issuetype","summary"]
 
-  # dropdown om >=2 värden
+  # dropdown if >=2 values
   issuetypes:
     Bug: 1
     Epic: 2
@@ -124,10 +126,10 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
   <input id="projectName" readonly>
 </div>
 
-<!-- Ordnade fält direkt under Project -->
+<!-- ordered fields under Project -->
 <div id="orderedFieldsTop"></div>
 
-<!-- Beskrivning (renderad bold-only) -->
+<!-- Desscription (renderad bold-only) -->
 <input type="hidden" id="descriptionRaw">
 <div class="row">
   <label id="labelDescription">description</label>
@@ -137,22 +139,22 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 <!-- Dynamics (ex: environment) -->
 <div id="dynamicFieldsContainers"></div>
 
-<!-- Resten av fälten -->
+<!-- Rest of fields -->
 <div id="dynamicFields"></div>
 
 <div class="actions">
-  <button id="openBtn">Öppna URL i ny flik</button>
-  <button id="copyBtn">Kopiera URL</button>
+  <button id="openBtn">Open URL in new tab</button>
+  <button id="copyBtn">Copy URL</button>
 </div>
 
-<div class="urlbox"><div class="small">Genererad URL</div><code id="out">—</code></div>
+<div class="urlbox"><div class="small">Generated URL</div><code id="out">—</code></div>
 
 <script>
 (function(){
 const errorBox = document.getElementById('errorBox');
 function showError(e){
   errorBox.style.display='block';
-  errorBox.textContent = 'Fel:\n' + (e && e.message ? e.message : String(e));
+  errorBox.textContent = 'Error:\n' + (e && e.message ? e.message : String(e));
 }
 
 /* --- helpers --- */
@@ -170,7 +172,7 @@ function renderBoldOnly(src){
   return esc.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g,(m,pre,txt)=>pre+'<strong>'+txt+'</strong>');
 }
 
-/* --- Minimal YAML parser (robustare) --- */
+/* --- Minimal YAML parser (more robust) --- */
 function parseYAML(text){
   const lines = text.replace(/\r\n?/g,'\n').split('\n');
   let i=0;
@@ -189,7 +191,7 @@ function parseYAML(text){
           pendingKey = null;
           continue;
         }
-        // Överindentering utan pendingKey -> avsluta det här blocket
+        // Overindenting without pendingKey -> concludes this block
         break;
       }
       let s = raw.slice(level);
@@ -206,12 +208,12 @@ function parseYAML(text){
         pendingKey = null;
         continue;
       }
-      if(val === ''){ // nested efterföljande rader
+      if(val === ''){ // nested following rows
         pendingKey = key;
         i++;
         continue;
       }
-      // inline scalar (inkl. inline-listor som [a,b])
+      // inline scalar (inkl. inline-lists as [a,b])
       obj[key] = parseScalar(val.trim());
       pendingKey = null;
       i++;
@@ -356,7 +358,7 @@ function buildURL(){
   if(currentPid) p.set('pid', String(currentPid));
   if(descRaw.value) p.set('description', descRaw.value);
 
-  // Hårdkodat alltid
+  // Always hardocde
   p.append('components','Comp1');
   p.append('labels','Label1');
 
@@ -365,7 +367,7 @@ function buildURL(){
     const v=(st.inputEl.value||'').trim(); if(v) p.set(fname, v);
   });
 
-  // Övriga YAML-fält
+  // other YAML-fields
   for(const [name, st] of Object.entries(currentFieldState)){
     const val=(st.value||'').trim(); if(!val) continue;
     const map=st.map;
