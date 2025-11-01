@@ -67,7 +67,7 @@ All labels in the UI match their YAML field names exactly (`project`, `descripti
 
 ---
 
-## 🖋 Text formatting
+## Text formatting
 Only **bold** text (`*text*`) is supported.  
 Line breaks (`\n`) are preserved exactly as written in the YAML block.
 
@@ -110,7 +110,7 @@ You can still edit the final field manually if needed.
 
 ---
 
-## 💾 Repository setup
+## Repository setup
 
 The project is fully local — no build tools or dependencies needed.
 
