@@ -1,36 +1,36 @@
-# Jira Mall  
+# (Simple) Jira Template Generator  
 [![Made with HTML](https://img.shields.io/badge/Made%20with-HTML-orange.svg)](https://developer.mozilla.org/en-US/docs/Web/HTML)
 [![No dependencies](https://img.shields.io/badge/Dependencies-None-brightgreen.svg)](#)
 [![Runs locally](https://img.shields.io/badge/Runs-Locally-blue.svg)](#)
 
 ---
 
-##  Bakgrund
-Jag såg av en slump att det gick att skapa ifyllda fält i Jira genom att lägga till parametrar direkt i en **URL**.  
-När jag klickade på en sådan länk öppnades ett nytt ärende – redan delvis ifyllt.  
-Det visade sig inte vara något officiellt API, utan snarare en intern Jira-funktion som Jira själv använder bakom kulisserna.  
+## Background
+By pure coincidence, I discovered that Jira can pre-fill issue fields simply by adding parameters to a **URL**.  
+When I clicked one of those URLs, a new issue opened — already filled in!  
+It turned out this wasn’t an official API, but rather an **internal Jira feature** used by the platform itself.
 
-Och jag tänkte: *tänk om man kunde ha en enkel webbsida som fyller i en felrapport åt en – direkt i Jira?*  
-Det här är resultatet.
+That led to a thought: *what if there was a simple webpage that built these URLs automatically — with reusable templates for common reports?*  
+This project is the result.
 
 ---
 
-## Redigera mallar
+## Editing templates
 
-Alla mallar och inställningar finns **överst i samma HTML-fil**, i YAML-blocket:  
+All templates and configuration live **at the top of the HTML file**, inside a YAML block:
 
 ```yaml
 <script type="text/yaml" id="templatesYaml">
 templates:
-  "Felrapport CCX-3":
+  "Bug report CCX-3":
     project: "CCX-3"
     issuetype: "Bug"
     summary: "Bug: <text>"
     description: |
-      *Felbeskrivning*
+      *Problem description*
       <text>
 
-      *Felupprepning*
+      *Reproduction*
       <text>
 
 defaults:
@@ -50,50 +50,52 @@ defaults:
 </script>
 ```
 
-💡 Du redigerar YAML-mallen **direkt i koden**.  
-Skälet: en SPA (Single Page Application) får normalt inte läsa in externa filer lokalt p.g.a. webbläsarens säkerhetsregler (CORS).  
-Därför ligger YAML:en inline – allt är självbärande och fungerar var som helst utan server eller nätverksåtkomst.
+💡 You edit the YAML **directly inside the file**.  
+Reason: a Single Page Application (SPA) cannot load local files due to browser sandbox (CORS) restrictions.  
+By embedding YAML inline, the tool remains fully self-contained — no dependencies, no external calls.
 
 ---
 
-## Fält
+## Fields
 
-- **templates** – varje mall visas i dropdown *Mall*.  
-- **defaults** – systemvärden (t.ex. baseUrl, endpoint, pid-mappning, ordning på fält och dropdown-listor).  
-- **dynamics** – definierar fält som byggs upp av flera dropdowns (ex. `environment` → `lab`, `node`, `build`).  
-  De valda alternativen skrivs ihop till ett textfält som skickas till Jira.
+- **templates** – each template appears in the *Template* dropdown.  
+- **defaults** – defines global settings (base URL, endpoint, PID mapping, field order, dropdown mappings).  
+- **dynamics** – defines fields built from multiple dropdowns (e.g. `environment` = `lab`, `node`, `build`).  
+  Selected values are combined into a single Jira field.
 
-Alla fältnamn i GUI:t matchar YAML-nycklarna exakt (`project`, `description`, `environment` osv).
-
----
-
-## Textformat
-Endast **fetstil** (`*text*`) stöds.  
-Radbrytningar (`\n`) bevaras som i YAML:en.
+All labels in the UI match their YAML field names exactly (`project`, `description`, `environment`, etc.).
 
 ---
 
-## Användning
-1. Spara filen som `jira-template.html`.  
-2. Kör lokalt:  
+## 🖋 Text formatting
+Only **bold** text (`*text*`) is supported.  
+Line breaks (`\n`) are preserved exactly as written in the YAML block.
+
+---
+
+## Usage
+
+1. Save the file as `jira-template.html`.  
+2. Run it locally:  
    ```bash
    python3 -m http.server 8080
-   # öppna http://localhost:8080/jira-template.html
+   # open http://localhost:8080/jira-template.html
    ```
-3. Välj mall, fyll i, och klicka **Skapa** → Jira öppnas med förifyllda fält.  
-   Eller klicka **Kopiera URL** för att dela länken.
+3. Choose a template, adjust the fields, and click **Create** → Jira opens with pre-filled fields.  
+   Or click **Copy URL** to share the generated link.
 
 ---
 
-## Säkerhet
-- Ingen extern JavaScript eller nätverkstrafik – allt körs lokalt.  
-- `window.open(..., 'noopener,noreferrer')` hindrar referer-läckor.  
-- YAML-parsern stöder endast säkra strukturer (inga skript eller anrop).  
-- Varning visas om URL överstiger 1800 tecken.
+## Security
+
+- No external JavaScript or network traffic — everything runs locally.  
+- `window.open(..., 'noopener,noreferrer')` prevents referer leaks.  
+- YAML parser supports only basic safe structures (no script execution).  
+- Warning is shown if URL length exceeds ~1800 characters.
 
 ---
 
-## Exempel på dynamiskt fält
+## Example of a dynamic field
 
 ```yaml
 dynamics:
@@ -103,19 +105,34 @@ dynamics:
     build: ["Build-Alpha","Build-Beta","Build-Gamma"]
 ```
 
-Detta skapar tre dropdowns – **Lab**, **Node** och **Build** – som tillsammans bygger upp fältet `environment` i Jira.  
-Om du skriver i fältet manuellt, ersätts dropdown-värdet vid nästa uppdatering.
+This generates three dropdowns — **Lab**, **Node**, and **Build** — which together form the `environment` field in Jira.  
+You can still edit the final field manually if needed.
 
 ---
 
-## Repo
-Projektet körs helt lokalt och kan läggas var som helst:
+## 💾 Repository setup
+
+The project is fully local — no build tools or dependencies needed.
 
 ```bash
 git clone https://github.com/stromg/jira-template.git
 cd jira-template
 python3 -m http.server 8080
 ```
+
+---
+
+## Reference links
+
+If you want to read about Jira’s built-in URL parameter feature, Atlassian provides these public references:
+
+- **Atlassian Knowledge Base:** [How to create issues using direct HTML links in Jira Server](https://confluence.atlassian.com/jirakb/how-to-create-issues-using-direct-html-links-in-jira-server-159474.html)  
+  Example:  
+  ```
+  https://jira.atlassian.com/secure/CreateIssueDetails!init.jspa?pid=10420&issuetype=4&summary=say+hello+world
+  ```
+
+- **Community discussion:** [Pre-populate Label in CreateIssue URL](https://community.atlassian.com/t5/Jira-questions/Pre-populate-Label-in-CreateIssue-URL/qaq-p/628361)
 
 ---
 
