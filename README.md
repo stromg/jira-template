@@ -42,7 +42,7 @@ defaults:
   issuetypes:
     Bug: 1
     Epic: 2
-  dynamics:
+  dynamic_fields:
     environment:
       lab:   ["LabA","LabB","LabC"]
       node:  ["Node1","Node2","Node3"]
@@ -60,7 +60,7 @@ By embedding YAML inline, the tool remains fully self-contained — no dependenc
 
 - **templates** – each template appears in the *Template* dropdown.  
 - **defaults** – defines global settings (base URL, endpoint, PID mapping, field order, dropdown mappings).  
-- **dynamics** – defines fields built from multiple dropdowns (e.g. `environment` = `lab`, `node`, `build`).  
+- **dynamic_fields** – defines fields built from multiple dropdowns (e.g. `environment` = `lab`, `node`, `build`).  
   Selected values are combined into a single Jira field.
 
 All labels in the UI match their YAML field names exactly (`project`, `description`, `environment`, etc.).
@@ -98,7 +98,7 @@ Line breaks (`\n`) are preserved exactly as written in the YAML block.
 ## Example of a dynamic field
 
 ```yaml
-dynamics:
+dynamic_fields:
   environment:
     lab:   ["LabA","LabB","LabC"]
     node:  ["Node1","Node2","Node3"]
