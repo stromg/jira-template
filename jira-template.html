@@ -118,7 +118,7 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 
 <div class="row">
   <label>Mall</label>
-  <select id="templateSelect"><option value="">— välj mall —</option></select>
+  <select id="templateSelect"><option value="">— Choose template —</option></select>
 </div>
 
 <div class="row">
@@ -319,14 +319,14 @@ function renderDynamicContainers(templateObj){
   clear(dynContainers); dynamic_fieldstate={};
   const d=config.defaults||{}, dyns=d.dynamic_fields||{}, templateKeys=new Set(Object.keys(templateObj||{}));
   Object.keys(dyns).forEach(fieldName=>{
-    if(templateKeys.has(fieldName)) return; // mallen överstyr dynamic_fields
+    if(templateKeys.has(fieldName)) return; // template ovverrides dynamic_fields
     const groups=dyns[fieldName]; if(!groups||typeof groups!=='object') return;
 
     const row=document.createElement('div');row.className='row';
     const label=document.createElement('label');label.textContent=fieldName;row.appendChild(label);
 
     const box=document.createElement('div');box.className='dynamic-box';
-    const top=document.createElement('div');top.className='label-top';top.textContent='Välj alternativ:';box.appendChild(top);
+    const top=document.createElement('div');top.className='label-top';top.textContent='Choose alternative:';box.appendChild(top);
 
     const bar=document.createElement('div');bar.className='inline';
     const selects=[];
@@ -410,7 +410,7 @@ function loadYamlFromTag(){
     config = y.templates ? { defaults: y.defaults||{}, templates: y.templates } : { defaults:{}, templates:y||{} };
 
     const sel=selTemplate; while(sel.firstChild) sel.removeChild(sel.firstChild);
-    sel.add(new Option('— välj mall —',''));
+    sel.add(new Option('— Choose template —',''));
     Object.keys(config.templates).forEach(k=> sel.add(new Option(k,k)));
   }catch(e){ showError(e); }
 }
