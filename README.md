@@ -15,6 +15,8 @@ This project is the result, and it might be helpful if, for some reason, Jiras b
 
 Note: you need to be logged in to Jira for this to work, use at own risk.
 
+<img src="img/screenshot.jpg" alt="Screenshot" width="70%">
+
 ---
 
 ##  Editing templates
