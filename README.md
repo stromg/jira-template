@@ -11,7 +11,7 @@ When I clicked one of those URLs, a new issue opened — already filled in!
 It turned out this wasn’t an official API, but rather an **internal Jira feature** used by the platform itself.
 
 That led to a thought: *what if there was a simple webpage that built these URLs automatically — with reusable templates for common reports?*  
-This project is the result, and no, i did not check if a solution already existed :)
+This project is the result, and it might be helpful if, for some reason, Jiras built in templates is not accessible.
 
 ---
 
@@ -136,5 +136,5 @@ If you want to read about Jira’s built-in URL parameter feature, Atlassian pro
 
 ---
 
-Vibe-coded with ❤️  by **Göran Ström**
+Vibe-coded with ❤️ by **Göran Ström**
 
