@@ -13,6 +13,8 @@ It turned out this wasn’t an official API, but rather an **internal Jira featu
 That led to a thought: *what if there was a simple webpage that built these URLs automatically — with reusable templates for common reports?*  
 This project is the result, and it might be helpful if, for some reason, Jiras built-in templates are not accessible.
 
+Note: you need to be logged in to Jira for this to work, use at own risk.
+
 ---
 
 ## Editing templates
