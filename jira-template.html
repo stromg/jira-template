@@ -182,7 +182,7 @@ function renderBoldOnly(src){
   return esc.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g,(m,pre,txt)=>pre+'<strong>'+txt+'</strong>');
 }
 
-/* --- simple YAML parser (supports nested blocks, scalars, inline lists) --- */
+/* --- minimal YAML parser --- */
 function parseYAML(text){
   const lines=text.replace(/\r\n?/g,'\n').split('\n');
   let i=0;
@@ -237,7 +237,7 @@ function parseYAML(text){
   return parseBlock(0);
 }
 
-/* --- main app --- */
+/* --- main app logic --- */
 const $=id=>document.getElementById(id);
 const selTemplate=$('templateSelect'),projectName=$('projectName'),
 descRaw=$('descriptionRaw'),descRendered=$('descRendered'),
@@ -245,7 +245,6 @@ orderedTop=$('orderedFieldsTop'),dynFieldsWrap=$('dynamicFields'),out=$('out');
 let config={},currentPid='',currentFieldState={};
 function clear(el){while(el.firstChild)el.removeChild(el.firstChild);}
 
-/* mapping lookup for field */
 function getMapForField(field){
   const d=config.defaults||{},maps=d.maps||{};
   if(field in maps)return maps[field];
@@ -253,20 +252,17 @@ function getMapForField(field){
   return null;
 }
 
-/* endpoint selection */
 function getEndpointPath(){
   const ep=(config.defaults?.endpoint||'init').toLowerCase();
   return ep==='default'?'/secure/CreateIssue!default.jspa':'/secure/CreateIssueDetails!init.jspa';
 }
 
-/* description renderer */
 function renderDescription(t){
   const raw=t.description||'';
   descRaw.value=raw;
   descRendered.innerHTML=renderBoldOnly(raw);
 }
 
-/* resolve mapping: string <-> number, with hint */
 function resolveMappedValue(map,rawVal){
   if(!map)return{send:rawVal,hint:''};
   const val=String(rawVal??'').trim();
@@ -280,7 +276,6 @@ function resolveMappedValue(map,rawVal){
   return{send:val,hint:''};
 }
 
-/* render one row (dynamic or normal) */
 function renderFieldRowInto(name,value,intoEl){
   if(['project','description'].includes(name))return;
   const d=config.defaults||{},dynCfgAll=d.dynamic_fields||{},dynCfg=dynCfgAll[name];
@@ -288,7 +283,6 @@ function renderFieldRowInto(name,value,intoEl){
   const row=document.createElement('div');row.className='row';
   const label=document.createElement('label');label.textContent=name;row.appendChild(label);
 
-  /* A) dynamic field UI */
   if(dynCfg&&typeof dynCfg==='object'){
     const box=document.createElement('div');box.className='dynamic-box';
     const top=document.createElement('div');top.className='label-top';top.textContent='Choose alternative:';box.appendChild(top);
@@ -311,7 +305,6 @@ function renderFieldRowInto(name,value,intoEl){
     intoEl.appendChild(row);return;
   }
 
-  /* B) normal map/dropdown/text */
   if(map&&mapKeys.length>=2){
     const sel=document.createElement('select');
     mapKeys.forEach(k=>sel.add(new Option(`${k} (${map[k]})`,k)));
@@ -333,7 +326,6 @@ function renderFieldRowInto(name,value,intoEl){
   intoEl.appendChild(row);
 }
 
-/* render all fields with defaults.order priority */
 function renderDynamicFieldsFromTemplate(t){
   clear(orderedTop);clear(dynFieldsWrap);currentFieldState={};
   const entries=Object.entries(t).filter(([k,_])=>!['project','description'].includes(k));
@@ -346,7 +338,6 @@ function renderDynamicFieldsFromTemplate(t){
   for(const[k,v]of entries)renderFieldRowInto(k,String(v),dynFieldsWrap);
 }
 
-/* build final Jira URL */
 function buildURL(){
   const d=config.defaults||{};
   const base=(d.baseUrl||'').replace(/\/+$/,'');
@@ -364,10 +355,8 @@ function buildURL(){
   return`${base}${ep}?${p.toString()}`;
 }
 
-/* UI update */
 function updateOut(){try{out.textContent=buildURL()||'—';}catch(e){showError(e);}}
 
-/* apply template */
 function applyTemplate(name){
   try{
     const t=config.templates[name];if(!t)return;
@@ -381,7 +370,6 @@ function applyTemplate(name){
   }catch(e){showError(e);}
 }
 
-/* load YAML into config */
 function loadYamlFromTag(){
   try{
     const txt=document.getElementById('templatesYaml').textContent;
@@ -394,23 +382,27 @@ function loadYamlFromTag(){
 }
 
 /* event bindings */
-document.getElementById('copyBtn').onclick = async () => {
-  try {
-    const u = buildURL();
-    if (!u) return alert('No URL.');
-    if (u.length > 1800) return alert('URL too long – shorten description/summary.');
+document.getElementById('openBtn').onclick=()=>{
+  try{
+    const u=buildURL();if(!u)return alert('Missing baseUrl/pid.');
+    if(u.length>1800)return alert('URL too long – shorten description/summary.');
+    window.open(u,'_blank','noopener,noreferrer');
+  }catch(e){showError(e);}
+};
+document.getElementById('copyBtn').onclick=async()=>{
+  try{
+    const u=buildURL();if(!u)return alert('No URL.');
+    if(u.length>1800)return alert('URL too long – shorten description/summary.');
     await navigator.clipboard.writeText(u);
     alert('URL copied.');
-  } catch (e) {
-    showError(e);
-  }
+  }catch(e){showError(e);}
 };
-selTemplate.onchange = e => applyTemplate(e.target.value);
+selTemplate.onchange=e=>applyTemplate(e.target.value);
 
 /* init */
 loadYamlFromTag();
-const first = selTemplate.options[1]?.value;
-if (first) { selTemplate.value = first; applyTemplate(first); }
+const first=selTemplate.options[1]?.value;
+if(first){selTemplate.value=first;applyTemplate(first);}
 updateOut();
 })();
 </script>
