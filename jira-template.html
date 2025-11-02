@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="sv">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -10,7 +10,7 @@
 templates:
   "Trouble report Software-3":
     project: "X-3"
-    issuetype: "Bug"
+    issuetype: "Bug"         # matches maps.issuetype -> sends ID
     summary: "Bug: <text>"
     description: |
       *Problem description*
@@ -24,7 +24,8 @@ templates:
 
   "Trouble Report Software-4":
     project: "X-4"
-    issuetype: "Bug"
+    issuetype: "Incident"    # no mapping -> sends "Incident" as text
+    priority: "2"            # works too (maps to ID if maps.priority exists)
     summary: "Bug: <text>"
     description: |
       *Problem description*
@@ -54,11 +55,11 @@ templates:
     labels: "droid,audio"
     customfield_12345: "SG-5"
     customfield_12346: "HV-1.0"
-    environment: ""   # får dynamisk UI (se defaults.dynamic_fields.environment)
+    environment: ""          # triggers dynamic UI (see defaults.dynamic_fields.environment)
 
 defaults:
   baseUrl: "https://mydomain.com"
-  endpoint: "init"   # "init" => CreateIssueDetails!init.jspa, "default" => CreateIssue!default.jspa
+  endpoint: "init"   # "init" => CreateIssueDetails!init.jspa (Cloud), "default" => CreateIssue!default.jspa (Server)
 
   # map project name -> pid
   pid:
@@ -66,25 +67,26 @@ defaults:
     "X-3":   10303
     "X-4":   10304
 
-  # valfri ordning (om fältet finns i mallen)
-  order: ["issuetype","summary","labels","environment"]
+  # preferred field order (only applies if field exists in template)
+  order: ["issuetype","summary","labels","priority","environment"]
 
-  # back-compat för issuetype
+  # fallback issuetype map
   issuetypes:
     "Bug": 1
     "Epic": 2
 
-  # generiska mappningar per fältnamn
+  # generic mappings per field (string -> number)
+  # if user enters ID directly, that value is used
   maps:
     issuetype:
       "Bug": 1
       "Epic": 2
-    # example:
-    # priority:
-    #   "P1": 1
-    #   "P2": 2
+    priority:
+      "P1": 1
+      "P2": 2
+      "P3": 3
 
-  # dynamiska fält-UI (endast om fältet finns i mallen)
+  # dynamic field UI configuration (only applies if field exists in template)
   dynamic_fields:
     environment:
       lab:   ["LabA","LabB","LabC"]
@@ -109,7 +111,7 @@ input,select{padding:8px;width:100%}
   min-height:60px;
   background:#fafafa;
   border-radius:6px;
-  white-space:pre-wrap; /* newline fix */
+  white-space:pre-wrap; /* preserve newlines */
 }
 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .dynamic-box{border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:8px;background:#fafafa}
@@ -137,21 +139,21 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
   <input id="projectName" readonly>
 </div>
 
-<!-- Ordered fields (from defaults.order) -->
+<!-- ordered fields -->
 <div id="orderedFieldsTop"></div>
 
-<!-- Description (renderad bold-only) -->
+<!-- description -->
 <input type="hidden" id="descriptionRaw">
 <div class="row">
   <label>description</label>
   <div id="descRendered" class="small"></div>
 </div>
 
-<!-- Remaining fields -->
+<!-- dynamic and remaining fields -->
 <div id="dynamicFields"></div>
 
 <div class="actions">
-  <button id="openBtn">Open URL in new tab</button>
+  <button id="openBtn">Open in Jira</button>
   <button id="copyBtn">Copy URL</button>
 </div>
 
@@ -159,94 +161,75 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 
 <script>
 (function(){
-const errorBox = document.getElementById('errorBox');
+const errorBox=document.getElementById('errorBox');
 function showError(e){
   errorBox.style.display='block';
-  errorBox.textContent = 'Error:\\n' + (e && e.message ? e.message : String(e));
+  errorBox.textContent='Error:\\n'+(e&&e.message?e.message:String(e));
 }
 
 /* --- helpers --- */
 function stripQuotes(s){
-  s = String(s||'').trim();
-  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'")))
+  s=String(s||'').trim();
+  if((s.startsWith('"')&&s.endsWith('"'))||(s.startsWith("'")&&s.endsWith("'")))
     return s.slice(1,-1);
   return s;
 }
 function escapeHTML(s){
-  return String(s||'').replace(/[&<>\"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(s||'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function renderBoldOnly(src){
   const esc=escapeHTML(src||'');
   return esc.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g,(m,pre,txt)=>pre+'<strong>'+txt+'</strong>');
 }
 
-/* --- Minimal YAML parser (block-literals, scalars, inline lists) --- */
+/* --- simple YAML parser (supports nested blocks, scalars, inline lists) --- */
 function parseYAML(text){
-  const lines = text.replace(/\r\n?/g,'\n').split('\n');
+  const lines=text.replace(/\r\n?/g,'\n').split('\n');
   let i=0;
-  function indentOf(s){ let n=0; for(const ch of s){ if(ch===' ') n++; else break; } return n; }
+  function indentOf(s){let n=0;for(const ch of s){if(ch===' ')n++;else break;}return n;}
   function parseBlock(level){
-    const obj = {};
-    let pendingKey = null;
-    while (i < lines.length){
-      let raw = lines[i];
-      if(raw == null || raw.trim()==='' || raw.trim().startsWith('#')){ i++; continue; }
-      const ind = indentOf(raw);
-      if(ind < level) break;
-      if(ind > level){
-        if(pendingKey!=null){
-          obj[pendingKey] = parseBlock(ind);
-          pendingKey = null;
-          continue;
-        }
+    const obj={};let pendingKey=null;
+    while(i<lines.length){
+      let raw=lines[i];
+      if(raw==null||raw.trim()===''||raw.trim().startsWith('#')){i++;continue;}
+      const ind=indentOf(raw);
+      if(ind<level)break;
+      if(ind>level){
+        if(pendingKey!=null){obj[pendingKey]=parseBlock(ind);pendingKey=null;continue;}
         break;
       }
-      let s = raw.slice(level);
-
-      const m = s.match(/^([^:#]+):\s*(.*)$/);
-      if(!m) throw new Error('Invalid YAML line: ' + raw);
-      const key = stripQuotes(m[1]);
-      let val = m[2];
-
-      if(val === '|'){ // block literal
-        i++;
-        obj[key] = readBlock(level+2);
-        pendingKey = null;
-        continue;
-      }
-      if(val === ''){ // nested object
-        pendingKey = key;
-        i++;
-        continue;
-      }
-      obj[key] = parseScalar(val.trim());
-      pendingKey = null;
-      i++;
+      let s=raw.slice(level);
+      const m=s.match(/^([^:#]+):\s*(.*)$/);
+      if(!m)throw new Error('Invalid YAML line: '+raw);
+      const key=stripQuotes(m[1]);
+      let val=m[2];
+      if(val==='|'){i++;obj[key]=readBlock(level+2);pendingKey=null;continue;}
+      if(val===''){pendingKey=key;i++;continue;}
+      obj[key]=parseScalar(val.trim());pendingKey=null;i++;
     }
     return obj;
   }
   function readBlock(level){
-    const out = [];
-    while(i < lines.length){
-      const raw = lines[i];
-      const ind = raw.match(/^ */)[0].length;
-      if(raw.trim()===''){ out.push(''); i++; continue; }
-      if(ind < level) break;
-      out.push(raw.slice(level));
-      i++;
+    const out=[];
+    while(i<lines.length){
+      const raw=lines[i];
+      const ind=raw.match(/^ */)[0].length;
+      if(raw.trim()===''){out.push('');i++;continue;}
+      if(ind<level)break;
+      out.push(raw.slice(level));i++;
     }
     return out.join('\n');
   }
   function parseScalar(s){
-    if(/^".*"$/.test(s)) return s.slice(1,-1).replace(/\\"/g,'"');
-    if(/^'.*'$/.test(s)) return s.slice(1,-1).replace(/''/g,"'");
-    if(s==='null') return null;
-    if(s==='true') return true;
-    if(s==='false') return false;
-    if(/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+    if(/^".*"$/.test(s))return s.slice(1,-1).replace(/\\"/g,'"');
+    if(/^'.*'$/.test(s))return s.slice(1,-1).replace(/''/g,"'");
+    if(s==='null')return null;
+    if(s==='true')return true;
+    if(s==='false')return false;
+    if(/^-?\d+(\.\d+)?$/.test(s))return Number(s);
     if(/^\[.*\]$/.test(s)){
-      const inner = s.slice(1,-1).trim();
-      if(!inner) return [];
+      const inner=s.slice(1,-1).trim();
+      if(!inner)return[];
       return inner.split(',').map(x=>parseScalar(x.trim()));
     }
     return stripQuotes(s);
@@ -254,249 +237,180 @@ function parseYAML(text){
   return parseBlock(0);
 }
 
-/* --- App --- */
+/* --- main app --- */
 const $=id=>document.getElementById(id);
 const selTemplate=$('templateSelect'),projectName=$('projectName'),
-      descRaw=$('descriptionRaw'),descRendered=$('descRendered'),
-      orderedTop=$('orderedFieldsTop'),dynFieldsWrap=$('dynamicFields'),out=$('out');
-
+descRaw=$('descriptionRaw'),descRendered=$('descRendered'),
+orderedTop=$('orderedFieldsTop'),dynFieldsWrap=$('dynamicFields'),out=$('out');
 let config={},currentPid='',currentFieldState={};
-
 function clear(el){while(el.firstChild)el.removeChild(el.firstChild);}
 
+/* mapping lookup for field */
 function getMapForField(field){
   const d=config.defaults||{},maps=d.maps||{};
-  if(field in maps) return maps[field];
-  if(field==='issuetype') return maps.issuetype || d.issuetypes || null;
+  if(field in maps)return maps[field];
+  if(field==='issuetype')return maps.issuetype||d.issuetypes||null;
   return null;
 }
+
+/* endpoint selection */
 function getEndpointPath(){
   const ep=(config.defaults?.endpoint||'init').toLowerCase();
-  return ep==='default' ? '/secure/CreateIssue!default.jspa'
-                        : '/secure/CreateIssueDetails!init.jspa';
+  return ep==='default'?'/secure/CreateIssue!default.jspa':'/secure/CreateIssueDetails!init.jspa';
 }
+
+/* description renderer */
 function renderDescription(t){
   const raw=t.description||'';
   descRaw.value=raw;
   descRendered.innerHTML=renderBoldOnly(raw);
 }
 
-/* Renderar EN rad (reglerna: dynamic_fields om fältet finns i mallen; annars map/dropdown/text) */
-function renderFieldRowInto(name, value, intoEl){
-  if (['project','description'].includes(name)) return;
+/* resolve mapping: string <-> number, with hint */
+function resolveMappedValue(map,rawVal){
+  if(!map)return{send:rawVal,hint:''};
+  const val=String(rawVal??'').trim();
+  if(val==='')return{send:'',hint:''};
+  if(Object.prototype.hasOwnProperty.call(map,val)){
+    const id=map[val];return{send:String(id),hint:`(${id})`};
+  }
+  for(const k of Object.keys(map)){
+    if(String(map[k])===val)return{send:val,hint:`(${val})`};
+  }
+  return{send:val,hint:''};
+}
 
-  const d = config.defaults || {};
-  const dynCfgAll = d.dynamic_fields || {};
-  const dynCfg = dynCfgAll[name];         // ex. environment: { lab:[..], node:[..], ... }
-  const map = getMapForField(name);       // ev. maps[name] / issuetypes
-  const mapKeys = map ? Object.keys(map) : [];
+/* render one row (dynamic or normal) */
+function renderFieldRowInto(name,value,intoEl){
+  if(['project','description'].includes(name))return;
+  const d=config.defaults||{},dynCfgAll=d.dynamic_fields||{},dynCfg=dynCfgAll[name];
+  const map=getMapForField(name);const mapKeys=map?Object.keys(map):[];
+  const row=document.createElement('div');row.className='row';
+  const label=document.createElement('label');label.textContent=name;row.appendChild(label);
 
-  const row = document.createElement('div');
-  row.className = 'row';
-  const label = document.createElement('label');
-  label.textContent = name;
-  row.appendChild(label);
-
-  // --- FALL A: fältet finns i mallen OCH har dynamic_fields-config → dynamisk UI
-  if (dynCfg && typeof dynCfg === 'object') {
-    const box = document.createElement('div');
-    box.className = 'dynamic-box';
-
-    // select-grupper
-    const top = document.createElement('div');
-    top.className = 'label-top';
-    top.textContent = 'Choose alternative:';
-    box.appendChild(top);
-
-    const bar = document.createElement('div');
-    bar.className = 'inline';
-
-    const selects = [];
-    Object.keys(dynCfg).forEach(groupKey => {
-      const sel = document.createElement('select');
-      (dynCfg[groupKey] || []).forEach(v => sel.add(new Option(v, v)));
-      bar.appendChild(sel);
-      selects.push(sel);
+  /* A) dynamic field UI */
+  if(dynCfg&&typeof dynCfg==='object'){
+    const box=document.createElement('div');box.className='dynamic-box';
+    const top=document.createElement('div');top.className='label-top';top.textContent='Choose alternative:';box.appendChild(top);
+    const bar=document.createElement('div');bar.className='inline';
+    const selects=[];
+    Object.keys(dynCfg).forEach(groupKey=>{
+      const sel=document.createElement('select');
+      (dynCfg[groupKey]||[]).forEach(v=>sel.add(new Option(v,v)));
+      bar.appendChild(sel);selects.push(sel);
     });
     box.appendChild(bar);
-
-    // manuellt inmatningsfält (komponerat värde), init med YAML-värde om det finns
-    const lbl2 = document.createElement('div');
-    lbl2.className = 'label-top';
-    lbl2.textContent = name;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = name;
-
-    const compose = () => selects.map(s => s.value).filter(Boolean).join(', ');
-    input.value = (value && String(value).trim()) ? String(value) : compose();
-
-    selects.forEach(s => s.addEventListener('change', () => {
-      input.value = compose();
-      currentFieldState[name].value = input.value;
-      updateOut();
-    }));
-    input.addEventListener('input', () => {
-      currentFieldState[name].value = input.value;
-      updateOut();
-    });
-
-    box.appendChild(lbl2);
-    box.appendChild(input);
-    row.appendChild(box);
-
-    currentFieldState[name] = { type:'text', value: input.value, map: null };
-    intoEl.appendChild(row);
-    return;
+    const lbl2=document.createElement('div');lbl2.className='label-top';lbl2.textContent=name;
+    const input=document.createElement('input');input.type='text';input.placeholder=name;
+    const compose=()=>selects.map(s=>s.value).filter(Boolean).join(', ');
+    input.value=(value&&String(value).trim())?String(value):compose();
+    selects.forEach(s=>s.addEventListener('change',()=>{input.value=compose();currentFieldState[name].value=input.value;updateOut();}));
+    input.addEventListener('input',()=>{currentFieldState[name].value=input.value;updateOut();});
+    box.appendChild(lbl2);box.appendChild(input);row.appendChild(box);
+    currentFieldState[name]={type:'text',value:input.value,map:null};
+    intoEl.appendChild(row);return;
   }
 
-  // --- FALL B: vanlig map/dropdown/text ---
-  if (map && mapKeys.length >= 2) {
-    const sel = document.createElement('select');
-    mapKeys.forEach(k => sel.add(new Option(`${k} (${map[k]})`, k)));
-    sel.value = (value && map[value] != null) ? value : mapKeys[0];
+  /* B) normal map/dropdown/text */
+  if(map&&mapKeys.length>=2){
+    const sel=document.createElement('select');
+    mapKeys.forEach(k=>sel.add(new Option(`${k} (${map[k]})`,k)));
+    sel.value=(value&&map[value]!=null)?value:mapKeys[0];
     row.appendChild(sel);
-    currentFieldState[name] = { type:'select', value: sel.value, map };
-    sel.addEventListener('change', () => { currentFieldState[name].value = sel.value; updateOut(); });
-  } else {
-    const wrap = document.createElement('div');
-    wrap.style.display = 'grid';
-    wrap.style.gridTemplateColumns = '1fr auto';
-    wrap.style.gap = '8px';
-
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.value = value || '';
-
-    const hint = document.createElement('div');
-    hint.className = 'hint';
-    hint.textContent = (map && value && map[value] != null) ? `(${map[value]})` : '';
-
-    wrap.appendChild(inp);
-    wrap.appendChild(hint);
-    row.appendChild(wrap);
-
-    currentFieldState[name] = { type:'text', value: inp.value, map, hintEl: hint };
-    inp.addEventListener('input', () => {
-      currentFieldState[name].value = inp.value;
-      if (map && map[inp.value] != null) hint.textContent = `(${map[inp.value]})`;
-      else hint.textContent = '';
-      updateOut();
-    });
+    const resolved=resolveMappedValue(map,sel.value);
+    const state={type:'select',value:sel.value,map,hintEl:null,resolved};
+    currentFieldState[name]=state;
+    const hint=document.createElement('div');hint.className='hint';hint.textContent=resolved.hint||'';row.appendChild(hint);state.hintEl=hint;
+    sel.addEventListener('change',()=>{state.value=sel.value;state.resolved=resolveMappedValue(map,state.value);state.hintEl.textContent=state.resolved.hint||'';updateOut();});
+  }else{
+    const wrap=document.createElement('div');wrap.style.display='grid';wrap.style.gridTemplateColumns='1fr auto';wrap.style.gap='8px';
+    const inp=document.createElement('input');inp.type='text';inp.value=value||'';
+    const hint=document.createElement('div');hint.className='hint';const initial=resolveMappedValue(map,inp.value);hint.textContent=initial.hint||'';
+    wrap.appendChild(inp);wrap.appendChild(hint);row.appendChild(wrap);
+    const state={type:'text',value:inp.value,map,hintEl:hint,resolved:initial};currentFieldState[name]=state;
+    inp.addEventListener('input',()=>{state.value=inp.value;state.resolved=resolveMappedValue(map,state.value);state.hintEl.textContent=state.resolved.hint||'';updateOut();});
   }
-
   intoEl.appendChild(row);
 }
 
-/* Renderar alla fält från template (respekterar defaults.order) */
+/* render all fields with defaults.order priority */
 function renderDynamicFieldsFromTemplate(t){
-  clear(orderedTop);
-  clear(dynFieldsWrap);
-  currentFieldState = {};
-
-  const entries = Object.entries(t).filter(([k,_]) => !['project','description'].includes(k));
-  const order = (config.defaults?.order) || [];
-
-  // 1) de som finns i order och i mallen
-  for (const fname of order) {
-    const idx = entries.findIndex(([k]) => k === fname);
-    if (idx >= 0) {
-      const [k, v] = entries.splice(idx, 1)[0];
-      renderFieldRowInto(k, String(v), orderedTop);
-    }
+  clear(orderedTop);clear(dynFieldsWrap);currentFieldState={};
+  const entries=Object.entries(t).filter(([k,_])=>!['project','description'].includes(k));
+  const order=(config.defaults?.order)||[];
+  for(const fname of order){
+    const idx=entries.findIndex(([k])=>k===fname);
+    if(idx>=0){const[k,v]=entries.splice(idx,1)[0];renderFieldRowInto(k,String(v),orderedTop);}
   }
-  // 2) resten i alfabetisk ordning
-  entries.sort((a,b) => a[0].localeCompare(b[0]));
-  for (const [k, v] of entries) renderFieldRowInto(k, String(v), dynFieldsWrap);
+  entries.sort((a,b)=>a[0].localeCompare(b[0]));
+  for(const[k,v]of entries)renderFieldRowInto(k,String(v),dynFieldsWrap);
 }
 
+/* build final Jira URL */
 function buildURL(){
   const d=config.defaults||{};
   const base=(d.baseUrl||'').replace(/\/+$/,'');
   const ep=getEndpointPath();
-  const p = new URLSearchParams();
-
-  // pid från projektnamn
-  if(currentPid) p.set('pid', String(currentPid));
-
-  // description
-  if(descRaw.value) p.set('description', descRaw.value);
-
-  // resterande fält
-  for (const [name, st] of Object.entries(currentFieldState)) {
-    const val = (st.value||'').trim();
-    if (!val) continue;
-
-    if (name === 'labels') {
-      val.split(',').map(s => s.trim()).filter(Boolean).forEach(l => p.append('labels', l));
-      continue;
-    }
-    const map = st.map;
-    if (map && map[val] != null) p.set(name, String(map[val])); // skicka ID
-    else p.set(name, val);                                      // skicka text
+  const p=new URLSearchParams();
+  if(currentPid)p.set('pid',String(currentPid));
+  if(descRaw.value)p.set('description',descRaw.value);
+  for(const[name,st]of Object.entries(currentFieldState)){
+    const rawVal=(st.value||'').trim();if(!rawVal)continue;
+    if(name==='labels'){rawVal.split(',').map(s=>s.trim()).filter(Boolean).forEach(l=>p.append('labels',l));continue;}
+    const resolved=resolveMappedValue(st.map,rawVal);
+    if(!resolved.send)continue;
+    p.set(name,resolved.send);
   }
-  return `${base}${ep}?${p.toString()}`;
+  return`${base}${ep}?${p.toString()}`;
 }
 
-function updateOut(){
-  try{
-    out.textContent = buildURL() || '—';
-  }catch(e){ showError(e); }
-}
+/* UI update */
+function updateOut(){try{out.textContent=buildURL()||'—';}catch(e){showError(e);}}
 
+/* apply template */
 function applyTemplate(name){
   try{
-    const t=config.templates[name]; if(!t) return;
+    const t=config.templates[name];if(!t)return;
     const d=config.defaults||{};
-
-    // Project -> pid
-    const projKey = t.project || '';
-    projectName.value = projKey;
-    currentPid = (d.pid && d.pid[projKey]!=null) ? d.pid[projKey] : '';
-
-    // Description
+    const projKey=t.project||'';projectName.value=projKey;
+    currentPid=(d.pid&&d.pid[projKey]!=null)?d.pid[projKey]:'';
     renderDescription(t);
-
-    // Rendera alla fält (ordning + dynamiska regler)
-    const reduced = {...t}; delete reduced.project; delete reduced.description;
+    const reduced={...t};delete reduced.project;delete reduced.description;
     renderDynamicFieldsFromTemplate(reduced);
-
     updateOut();
-  }catch(e){ showError(e); }
+  }catch(e){showError(e);}
 }
 
+/* load YAML into config */
 function loadYamlFromTag(){
   try{
     const txt=document.getElementById('templatesYaml').textContent;
     const y=parseYAML(txt);
-    config = y.templates ? { defaults: y.defaults||{}, templates: y.templates } : { defaults:{}, templates:y||{} };
-
-    const sel=selTemplate; while(sel.firstChild) sel.removeChild(sel.firstChild);
+    config=y.templates?{defaults:y.defaults||{},templates:y.templates}:{defaults:{},templates:y||{}};
+    const sel=selTemplate;while(sel.firstChild)sel.removeChild(sel.firstChild);
     sel.add(new Option('— Choose template —',''));
-    Object.keys(config.templates).forEach(k=> sel.add(new Option(k,k)));
-  }catch(e){ showError(e); }
+    Object.keys(config.templates).forEach(k=>sel.add(new Option(k,k)));
+  }catch(e){showError(e);}
 }
 
-/* Bindings */
-document.getElementById('openBtn').onclick=()=>{
-  try{
-    const u=buildURL(); if(!u) return alert('Missing baseUrl/pid.');
-    if(u.length>1800) return alert('URL too long – shorten description/summary.');
-    window.open(u,'_blank','noopener,noreferrer');
-  }catch(e){ showError(e); }
+/* event bindings */
+document.getElementById('copyBtn').onclick = async () => {
+  try {
+    const u = buildURL();
+    if (!u) return alert('No URL.');
+    if (u.length > 1800) return alert('URL too long – shorten description/summary.');
+    await navigator.clipboard.writeText(u);
+    alert('URL copied.');
+  } catch (e) {
+    showError(e);
+  }
 };
-document.getElementById('copyBtn').onclick=async()=>{
-  try{
-    const u=buildURL(); if(!u) return alert('No URL.');
-    if(u.length>1800) return alert('URL too long – shorten description/summary.');
-    await navigator.clipboard.writeText(u); alert('URL copied.');
-  }catch(e){ showError(e); }
-};
-selTemplate.onchange=e=>applyTemplate(e.target.value);
+selTemplate.onchange = e => applyTemplate(e.target.value);
 
-/* Init */
+/* init */
 loadYamlFromTag();
-const first=selTemplate.options[1]?.value; if(first){ selTemplate.value=first; applyTemplate(first); }
+const first = selTemplate.options[1]?.value;
+if (first) { selTemplate.value = first; applyTemplate(first); }
 updateOut();
 })();
 </script>
